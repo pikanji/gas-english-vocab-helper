@@ -103,7 +103,7 @@ function fillMissingData() {
   
   // Process feature 3: Generate example sentences
   if (exampleColIndex !== -1) {
-    generateExampleSentences(sheet, values, englishColIndex, exampleColIndex);
+    generateExampleSentences(sheet, values, englishColIndex, exampleColIndex, contextColIndex);
     
     // Refresh data after feature 3
     dataRange = sheet.getDataRange();
@@ -112,7 +112,7 @@ function fillMissingData() {
   
   // Process feature 4: Generate synonyms
   if (synonymColIndex !== -1) {
-    generateSynonyms(sheet, values, englishColIndex, synonymColIndex);
+    generateSynonyms(sheet, values, englishColIndex, synonymColIndex, contextColIndex);
   }
   
   SpreadsheetApp.getUi().alert('Process completed!');
@@ -183,7 +183,7 @@ function processJapaneseToEnglish(sheet, values, japaneseColIndex, englishColInd
 /**
  * Generate example sentences
  */
-function generateExampleSentences(sheet, values, englishColIndex, exampleColIndex) {
+function generateExampleSentences(sheet, values, englishColIndex, exampleColIndex, contextColIndex) {
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
     
@@ -192,8 +192,11 @@ function generateExampleSentences(sheet, values, englishColIndex, exampleColInde
     
     // Check if Example is empty and English is not
     if (!row[exampleColIndex] && row[englishColIndex]) {
+      // Get context if available
+      const context = contextColIndex !== -1 ? row[contextColIndex] : "";
+      
       // Generate example sentence
-      const example = generateExampleWithOpenAI(row[englishColIndex]);
+      const example = generateExampleWithOpenAI(row[englishColIndex], context);
       
       // Update cell
       if (example) {
@@ -211,7 +214,7 @@ function generateExampleSentences(sheet, values, englishColIndex, exampleColInde
 /**
  * Find synonyms
  */
-function generateSynonyms(sheet, values, englishColIndex, synonymColIndex) {
+function generateSynonyms(sheet, values, englishColIndex, synonymColIndex, contextColIndex) {
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
     
@@ -220,8 +223,11 @@ function generateSynonyms(sheet, values, englishColIndex, synonymColIndex) {
     
     // Check if Synonym is empty and English is not
     if (!row[synonymColIndex] && row[englishColIndex]) {
+      // Get context if available
+      const context = contextColIndex !== -1 ? row[contextColIndex] : "";
+      
       // Find synonyms
-      const synonyms = findSynonymsWithOpenAI(row[englishColIndex]);
+      const synonyms = findSynonymsWithOpenAI(row[englishColIndex], context);
       
       // Update cell
       if (synonyms) {
@@ -324,16 +330,23 @@ function translateWithOpenAI(text, sourceLang, targetLang, context = "") {
  * Generate example sentence using OpenAI API
  * 
  * @param {string} word - The English word or phrase to generate an example for
+ * @param {string} context - Optional context for example generation
  * @return {string} The example sentence
  */
-function generateExampleWithOpenAI(word) {
+function generateExampleWithOpenAI(word, context = "") {
   try {
+    let systemPrompt = 'You are a language teacher who creates clear, natural example sentences using English vocabulary. Create a sentence that demonstrates the correct usage of the given word or phrase. Return ONLY the example sentence and nothing else.';
+    
+    if (context) {
+      systemPrompt += ` Consider this context when creating the example: ${context}`;
+    }
+    
     const requestData = {
       'model': MODEL,
       'messages': [
         {
           'role': 'system',
-          'content': 'You are a language teacher who creates clear, natural example sentences using English vocabulary. Create a sentence that demonstrates the correct usage of the given word or phrase. Return ONLY the example sentence and nothing else.'
+          'content': systemPrompt
         },
         {
           'role': 'user',
@@ -361,16 +374,23 @@ function generateExampleWithOpenAI(word) {
  * Find synonyms using OpenAI API
  * 
  * @param {string} word - The English word or phrase to find synonyms for
+ * @param {string} context - Optional context for synonym finding
  * @return {string} A comma-separated list of synonyms
  */
-function findSynonymsWithOpenAI(word) {
+function findSynonymsWithOpenAI(word, context = "") {
   try {
+    let systemPrompt = 'You are a language expert who identifies accurate synonyms for English words and phrases. Find 3-5 existing synonyms for the given word or phrase. Return ONLY a comma-separated list of synonyms, with no other text or explanations. Only include well-established synonyms that would be found in a thesaurus.';
+    
+    if (context) {
+      systemPrompt += ` Use this context to find the most appropriate synonyms: ${context}`;
+    }
+    
     const requestData = {
       'model': MODEL,
       'messages': [
         {
           'role': 'system',
-          'content': 'You are a language expert who identifies accurate synonyms for English words and phrases. Find 3-5 existing synonyms for the given word or phrase. Return ONLY a comma-separated list of synonyms, with no other text or explanations. Only include well-established synonyms that would be found in a thesaurus.'
+          'content': systemPrompt
         },
         {
           'role': 'user',

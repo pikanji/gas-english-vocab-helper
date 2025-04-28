@@ -27,7 +27,7 @@ A Google Apps Script tool to automatically fill missing data in vocabulary lists
    - "日本語" (Japanese)
    - "例文" (Example sentences)
    - "類義語" (Synonyms)
-   - "文脈" (Context) - optional, provides context for translations
+   - "文脈" (Context) - optional, provides context for all operations
 
 2. Click on the "Vocabulary Helper" menu item that appears in your spreadsheet
 3. Select "Set OpenAI API Key" to securely save your API key
@@ -38,7 +38,7 @@ A Google Apps Script tool to automatically fill missing data in vocabulary lists
 - The script processes each feature in sequence
 - Each feature uses the updated data from previous features
 - Cells updated by the script are highlighted in light purple
-- If the "文脈" column has a value, it will be used as context for translations
+- If the "文脈" column has a value, it will be used as context for all operations (translations, examples, and synonyms)
 - Your API key is stored securely in script properties, not in the code
 
 ## License

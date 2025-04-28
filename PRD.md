@@ -18,4 +18,4 @@ License: MIT
 
 ## Technical Requirments
 - Use OpenAI API for translations.
-- For translation process, use the value in the "文脈" column of the same row as the context of translation, if it is not empty.
+- For each feature, use the value in the "文脈" column of the same row as the context of translation, if it is not empty.

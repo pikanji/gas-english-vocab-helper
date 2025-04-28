@@ -134,7 +134,7 @@ function processEnglishToJapanese(sheet, values, englishColIndex, japaneseColInd
       const context = contextColIndex !== -1 ? row[contextColIndex] : "";
       
       // Translate
-      const translation = translateText(row[englishColIndex], "en", "ja", context);
+      const translation = translateWithOpenAI(row[englishColIndex], "en", "ja", context);
       
       // Update cell
       if (translation) {
@@ -142,6 +142,9 @@ function processEnglishToJapanese(sheet, values, englishColIndex, japaneseColInd
         cell.setValue(translation);
         cell.setBackground(HIGHLIGHT_COLOR);
       }
+      
+      // Add a short delay to avoid hitting API rate limits
+      Utilities.sleep(200);
     }
   }
 }
@@ -162,7 +165,7 @@ function processJapaneseToEnglish(sheet, values, japaneseColIndex, englishColInd
       const context = contextColIndex !== -1 ? row[contextColIndex] : "";
       
       // Translate
-      const translation = translateText(row[japaneseColIndex], "ja", "en", context);
+      const translation = translateWithOpenAI(row[japaneseColIndex], "ja", "en", context);
       
       // Update cell
       if (translation) {
@@ -170,6 +173,9 @@ function processJapaneseToEnglish(sheet, values, japaneseColIndex, englishColInd
         cell.setValue(translation);
         cell.setBackground(HIGHLIGHT_COLOR);
       }
+      
+      // Add a short delay to avoid hitting API rate limits
+      Utilities.sleep(200);
     }
   }
 }
@@ -187,7 +193,7 @@ function generateExampleSentences(sheet, values, englishColIndex, exampleColInde
     // Check if Example is empty and English is not
     if (!row[exampleColIndex] && row[englishColIndex]) {
       // Generate example sentence
-      const example = generateExample(row[englishColIndex]);
+      const example = generateExampleWithOpenAI(row[englishColIndex]);
       
       // Update cell
       if (example) {
@@ -195,6 +201,9 @@ function generateExampleSentences(sheet, values, englishColIndex, exampleColInde
         cell.setValue(example);
         cell.setBackground(HIGHLIGHT_COLOR);
       }
+      
+      // Add a short delay to avoid hitting API rate limits
+      Utilities.sleep(200);
     }
   }
 }
@@ -212,7 +221,7 @@ function generateSynonyms(sheet, values, englishColIndex, synonymColIndex) {
     // Check if Synonym is empty and English is not
     if (!row[synonymColIndex] && row[englishColIndex]) {
       // Find synonyms
-      const synonyms = generateSynonym(row[englishColIndex]);
+      const synonyms = findSynonymsWithOpenAI(row[englishColIndex]);
       
       // Update cell
       if (synonyms) {
@@ -220,91 +229,167 @@ function generateSynonyms(sheet, values, englishColIndex, synonymColIndex) {
         cell.setValue(synonyms);
         cell.setBackground(HIGHLIGHT_COLOR);
       }
+      
+      // Add a short delay to avoid hitting API rate limits
+      Utilities.sleep(200);
     }
   }
 }
 
 /**
- * Translate text using OpenAI API
+ * Makes a request to the OpenAI API
+ * 
+ * @param {object} requestData - The data to send to the API
+ * @return {object} The API response
  */
-function translateText(text, fromLang, toLang, context = "") {
+function callOpenAI(requestData) {
+  const apiKey = getOpenAiApiKey();
+  const url = 'https://api.openai.com/v1/chat/completions';
+  
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'headers': {
+      'Authorization': 'Bearer ' + apiKey
+    },
+    'payload': JSON.stringify(requestData),
+    'muteHttpExceptions': true
+  };
+  
   try {
-    let prompt = "";
+    const response = UrlFetchApp.fetch(url, options);
+    return JSON.parse(response.getContentText());
+  } catch (error) {
+    console.error('OpenAI API error: ' + error);
+    throw new Error('Error calling OpenAI API: ' + error);
+  }
+}
+
+/**
+ * Translates text from source language to target language using OpenAI
+ * 
+ * @param {string} text - The text to translate
+ * @param {string} sourceLang - The source language code
+ * @param {string} targetLang - The target language code
+ * @param {string} context - Optional context for translation
+ * @return {string} The translated text
+ */
+function translateWithOpenAI(text, sourceLang, targetLang, context = "") {
+  try {
+    // Map language codes to full names for better OpenAI understanding
+    const languageMap = {
+      'en': 'English',
+      'ja': 'Japanese'
+    };
+    
+    const sourceLanguage = languageMap[sourceLang] || sourceLang;
+    const targetLanguage = languageMap[targetLang] || targetLang;
+    
+    let systemPrompt = `You are a professional translator specialized in ${sourceLanguage} and ${targetLanguage}. Translate the given text from ${sourceLanguage} to ${targetLanguage}. Provide ONLY the translation, without any explanations or additional text.`;
+    
     if (context) {
-      prompt = `Translate the following ${fromLang === "en" ? "English" : "Japanese"} text to ${toLang === "en" ? "English" : "Japanese"}. Context: ${context}\nText: ${text}`;
-    } else {
-      prompt = `Translate the following ${fromLang === "en" ? "English" : "Japanese"} text to ${toLang === "en" ? "English" : "Japanese"}: ${text}`;
+      systemPrompt += ` Use the following context to inform your translation: ${context}`;
     }
     
-    const response = callOpenAI(prompt);
-    return response.trim();
-  } catch (e) {
-    console.error("Translation error:", e);
-    return "";
+    const requestData = {
+      'model': MODEL,
+      'messages': [
+        {
+          'role': 'system',
+          'content': systemPrompt
+        },
+        {
+          'role': 'user',
+          'content': text
+        }
+      ],
+      'temperature': 0.3,
+      'max_tokens': 500
+    };
+    
+    const response = callOpenAI(requestData);
+    if (response && response.choices && response.choices.length > 0) {
+      return response.choices[0].message.content.trim();
+    } else {
+      console.error('Unexpected OpenAI response format for translation:', JSON.stringify(response));
+      return targetLang === 'ja' ? '翻訳エラー' : 'Translation error';
+    }
+  } catch (error) {
+    console.error('Translation error: ' + error);
+    return targetLang === 'ja' ? '翻訳エラー' : 'Translation error';
   }
 }
 
 /**
  * Generate example sentence using OpenAI API
+ * 
+ * @param {string} word - The English word or phrase to generate an example for
+ * @return {string} The example sentence
  */
-function generateExample(word) {
+function generateExampleWithOpenAI(word) {
   try {
-    const prompt = `Generate a natural and useful example sentence using the English word or phrase: "${word}". Only return the example sentence and nothing else.`;
-    const response = callOpenAI(prompt);
-    return response.trim();
-  } catch (e) {
-    console.error("Example generation error:", e);
-    return "";
+    const requestData = {
+      'model': MODEL,
+      'messages': [
+        {
+          'role': 'system',
+          'content': 'You are a language teacher who creates clear, natural example sentences using English vocabulary. Create a sentence that demonstrates the correct usage of the given word or phrase. Return ONLY the example sentence and nothing else.'
+        },
+        {
+          'role': 'user',
+          'content': word
+        }
+      ],
+      'temperature': 0.7,
+      'max_tokens': 150
+    };
+    
+    const response = callOpenAI(requestData);
+    if (response && response.choices && response.choices.length > 0) {
+      return response.choices[0].message.content.trim();
+    } else {
+      console.error('Unexpected OpenAI response format for example generation:', JSON.stringify(response));
+      return '例文生成エラー'; // Example generation error in Japanese
+    }
+  } catch (error) {
+    console.error('Example generation error: ' + error);
+    return '例文生成エラー'; // Example generation error in Japanese
   }
 }
 
 /**
- * Generate synonyms using OpenAI API
+ * Find synonyms using OpenAI API
+ * 
+ * @param {string} word - The English word or phrase to find synonyms for
+ * @return {string} A comma-separated list of synonyms
  */
-function generateSynonym(word) {
+function findSynonymsWithOpenAI(word) {
   try {
-    const prompt = `Find 3-5 existing synonyms for the English word or phrase: "${word}". Return the synonyms as a comma-separated list. Only include well-established synonyms that would be found in a thesaurus.`;
-    const response = callOpenAI(prompt);
-    return response.trim();
-  } catch (e) {
-    console.error("Synonym finding error:", e);
-    return "";
+    const requestData = {
+      'model': MODEL,
+      'messages': [
+        {
+          'role': 'system',
+          'content': 'You are a language expert who identifies accurate synonyms for English words and phrases. Find 3-5 existing synonyms for the given word or phrase. Return ONLY a comma-separated list of synonyms, with no other text or explanations. Only include well-established synonyms that would be found in a thesaurus.'
+        },
+        {
+          'role': 'user',
+          'content': word
+        }
+      ],
+      'temperature': 0.3,
+      'max_tokens': 100
+    };
+    
+    const response = callOpenAI(requestData);
+    if (response && response.choices && response.choices.length > 0) {
+      return response.choices[0].message.content.trim();
+    } else {
+      console.error('Unexpected OpenAI response format for synonym finding:', JSON.stringify(response));
+      return '類義語検索エラー'; // Synonym finding error in Japanese
+    }
+  } catch (error) {
+    console.error('Synonym finding error: ' + error);
+    return '類義語検索エラー'; // Synonym finding error in Japanese
   }
-}
-
-/**
- * Call OpenAI API with the given prompt
- */
-function callOpenAI(prompt) {
-  const apiKey = getOpenAiApiKey();
-  const url = "https://api.openai.com/v1/chat/completions";
-  
-  const payload = {
-    model: MODEL,
-    messages: [
-      {role: "system", content: "You are a helpful assistant that specializes in language translation and vocabulary help."},
-      {role: "user", content: prompt}
-    ],
-    temperature: 0.3,
-    max_tokens: 200
-  };
-  
-  const options = {
-    method: "post",
-    contentType: "application/json",
-    headers: {
-      "Authorization": "Bearer " + apiKey
-    },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-  
-  const response = UrlFetchApp.fetch(url, options);
-  const json = JSON.parse(response.getContentText());
-  
-  if (json.error) {
-    throw new Error(json.error.message);
-  }
-  
-  return json.choices[0].message.content;
 } 

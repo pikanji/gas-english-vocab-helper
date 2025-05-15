@@ -103,7 +103,7 @@ function fillMissingData() {
   
   // Process feature 3: Generate example sentences
   if (exampleColIndex !== -1) {
-    generateExampleSentences(sheet, values, englishColIndex, exampleColIndex, contextColIndex);
+    generateExampleSentences(sheet, values, englishColIndex, exampleColIndex, contextColIndex, japaneseColIndex);
     
     // Refresh data after feature 3
     dataRange = sheet.getDataRange();
@@ -112,7 +112,7 @@ function fillMissingData() {
   
   // Process feature 4: Generate synonyms
   if (synonymColIndex !== -1) {
-    generateSynonyms(sheet, values, englishColIndex, synonymColIndex, contextColIndex);
+    generateSynonyms(sheet, values, englishColIndex, synonymColIndex, contextColIndex, japaneseColIndex);
   }
   
   SpreadsheetApp.getUi().alert('Process completed!');
@@ -183,7 +183,7 @@ function processJapaneseToEnglish(sheet, values, japaneseColIndex, englishColInd
 /**
  * Generate example sentences
  */
-function generateExampleSentences(sheet, values, englishColIndex, exampleColIndex, contextColIndex) {
+function generateExampleSentences(sheet, values, englishColIndex, exampleColIndex, contextColIndex, japaneseColIndex) {
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
     
@@ -195,8 +195,11 @@ function generateExampleSentences(sheet, values, englishColIndex, exampleColInde
       // Get context if available
       const context = contextColIndex !== -1 ? row[contextColIndex] : "";
       
+      // Get Japanese meaning if available (to use as additional context)
+      const japaneseMeaning = (japaneseColIndex !== -1 && row[japaneseColIndex]) ? row[japaneseColIndex] : "";
+      
       // Generate example sentence
-      const example = generateExampleWithOpenAI(row[englishColIndex], context);
+      const example = generateExampleWithOpenAI(row[englishColIndex], context, japaneseMeaning);
       
       // Update cell
       if (example) {
@@ -214,7 +217,7 @@ function generateExampleSentences(sheet, values, englishColIndex, exampleColInde
 /**
  * Find synonyms
  */
-function generateSynonyms(sheet, values, englishColIndex, synonymColIndex, contextColIndex) {
+function generateSynonyms(sheet, values, englishColIndex, synonymColIndex, contextColIndex, japaneseColIndex) {
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
     
@@ -226,8 +229,11 @@ function generateSynonyms(sheet, values, englishColIndex, synonymColIndex, conte
       // Get context if available
       const context = contextColIndex !== -1 ? row[contextColIndex] : "";
       
+      // Get Japanese meaning if available (to use as additional context)
+      const japaneseMeaning = (japaneseColIndex !== -1 && row[japaneseColIndex]) ? row[japaneseColIndex] : "";
+      
       // Find synonyms
-      const synonyms = findSynonymsWithOpenAI(row[englishColIndex], context);
+      const synonyms = findSynonymsWithOpenAI(row[englishColIndex], context, japaneseMeaning);
       
       // Update cell
       if (synonyms) {
@@ -331,11 +337,16 @@ function translateWithOpenAI(text, sourceLang, targetLang, context = "") {
  * 
  * @param {string} word - The English word or phrase to generate an example for
  * @param {string} context - Optional context for example generation
+ * @param {string} japaneseMeaning - Optional Japanese meaning of the word to help with context
  * @return {string} The example sentence
  */
-function generateExampleWithOpenAI(word, context = "") {
+function generateExampleWithOpenAI(word, context = "", japaneseMeaning = "") {
   try {
     let systemPrompt = 'You are a language teacher who creates clear, natural example sentences using English vocabulary. Create a sentence that demonstrates the correct usage of the given word or phrase. Return ONLY the example sentence and nothing else.';
+    
+    if (japaneseMeaning) {
+      systemPrompt += ` The Japanese meaning of the word/phrase is "${japaneseMeaning}". Use this meaning to create a more accurate example.`;
+    }
     
     if (context) {
       systemPrompt += ` Consider this context when creating the example: ${context}`;
@@ -375,11 +386,16 @@ function generateExampleWithOpenAI(word, context = "") {
  * 
  * @param {string} word - The English word or phrase to find synonyms for
  * @param {string} context - Optional context for synonym finding
+ * @param {string} japaneseMeaning - Optional Japanese meaning of the word to help with context
  * @return {string} A comma-separated list of synonyms
  */
-function findSynonymsWithOpenAI(word, context = "") {
+function findSynonymsWithOpenAI(word, context = "", japaneseMeaning = "") {
   try {
     let systemPrompt = 'You are a language expert who identifies accurate synonyms for English words and phrases. Find 3-5 existing synonyms for the given word or phrase. Return ONLY a comma-separated list of synonyms, with no other text or explanations. Only include well-established synonyms that would be found in a thesaurus.';
+    
+    if (japaneseMeaning) {
+      systemPrompt += ` The Japanese meaning of the word/phrase is "${japaneseMeaning}". Use this meaning to find synonyms that match this specific meaning of the word, not other possible meanings.`;
+    }
     
     if (context) {
       systemPrompt += ` Use this context to find the most appropriate synonyms: ${context}`;
@@ -412,4 +428,4 @@ function findSynonymsWithOpenAI(word, context = "") {
     console.error('Synonym finding error: ' + error);
     return '類義語検索エラー'; // Synonym finding error in Japanese
   }
-} 
+}

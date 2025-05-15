@@ -11,6 +11,7 @@ A Google Apps Script tool to automatically fill missing data in vocabulary lists
 - Highlights updated cells with light purple color
 - Uses OpenAI API for translation and content generation
 - Securely stores API key in script properties
+- Uses Japanese meanings to generate more accurate examples and synonyms
 
 ## Setup Instructions
 
@@ -39,6 +40,7 @@ A Google Apps Script tool to automatically fill missing data in vocabulary lists
 - Each feature uses the updated data from previous features
 - Cells updated by the script are highlighted in light purple
 - If the "文脈" column has a value, it will be used as context for all operations (translations, examples, and synonyms)
+- The Japanese meaning of each word is used when generating example sentences and synonyms to ensure they match the specific intended meaning
 - Your API key is stored securely in script properties, not in the code
 
 ## License

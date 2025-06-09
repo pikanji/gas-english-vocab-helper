@@ -4,7 +4,7 @@
  */
 
 // Configuration
-const MODEL = "gpt-4o"; // OpenAI model to use
+const MODEL = "gpt-4.1"; // OpenAI model to use
 const HIGHLIGHT_COLOR = "#E6E6FA"; // Light purple for highlighting updated cells
 
 /**
@@ -342,7 +342,7 @@ function translateWithOpenAI(text, sourceLang, targetLang, context = "") {
  */
 function generateExampleWithOpenAI(word, context = "", japaneseMeaning = "") {
   try {
-    let systemPrompt = 'You are a language teacher who creates clear, natural example sentences using English vocabulary. Create a sentence that demonstrates the correct usage of the given word or phrase. Return ONLY the example sentence and nothing else.';
+    let systemPrompt = 'You are a language teacher who creates clear, natural example sentences using English vocabulary. Create a sentence that demonstrates the correct usage of the given word or phrase. Make the sentence that facilitates the leaner to image the situation.Make the sentence at most about 15 words to keep it simple. Return ONLY the example sentence and nothing else.';
     
     if (japaneseMeaning) {
       systemPrompt += ` The Japanese meaning of the word/phrase is "${japaneseMeaning}". Use this meaning to create a more accurate example.`;

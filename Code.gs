@@ -80,6 +80,7 @@ function fillMissingData() {
   const exampleColIndex = headers.indexOf("例文");
   const synonymColIndex = headers.indexOf("類義語");
   const contextColIndex = headers.indexOf("文脈");
+  const exampleJapaneseColIndex = headers.indexOf("例文和訳");
   
   // Check if required columns exist
   if (englishColIndex === -1 || japaneseColIndex === -1) {
@@ -110,7 +111,16 @@ function fillMissingData() {
     values = dataRange.getValues();
   }
   
-  // Process feature 4: Generate synonyms
+  // Process feature 4: Translate example sentences to Japanese
+  if (exampleColIndex !== -1 && exampleJapaneseColIndex !== -1) {
+    processExampleTranslations(sheet, values, exampleColIndex, exampleJapaneseColIndex, contextColIndex);
+
+    // Refresh data after feature 4
+    dataRange = sheet.getDataRange();
+    values = dataRange.getValues();
+  }
+
+  // Process feature 5: Generate synonyms
   if (synonymColIndex !== -1) {
     generateSynonyms(sheet, values, englishColIndex, synonymColIndex, contextColIndex, japaneseColIndex);
   }
@@ -249,6 +259,37 @@ function generateSynonyms(sheet, values, englishColIndex, synonymColIndex, conte
 }
 
 /**
+ * Translate example sentences from English to Japanese
+ */
+function processExampleTranslations(sheet, values, exampleColIndex, exampleJapaneseColIndex, contextColIndex) {
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+
+    // Skip empty rows
+    if (!row[exampleColIndex]) continue;
+
+    // Check if Japanese example translation is empty and English example exists
+    if (!row[exampleJapaneseColIndex] && row[exampleColIndex]) {
+      // Get context if available
+      const context = contextColIndex !== -1 ? row[contextColIndex] : "";
+
+      // Translate example sentence
+      const translation = translateWithOpenAI(row[exampleColIndex], "en", "ja", context);
+
+      // Update cell
+      if (translation) {
+        const cell = sheet.getRange(i + 1, exampleJapaneseColIndex + 1);
+        cell.setValue(translation);
+        cell.setBackground(HIGHLIGHT_COLOR);
+      }
+
+      // Add a short delay to avoid hitting API rate limits
+      Utilities.sleep(200);
+    }
+  }
+}
+
+/**
  * Makes a request to the OpenAI API
  * 
  * @param {object} requestData - The data to send to the API
@@ -298,7 +339,11 @@ function translateWithOpenAI(text, sourceLang, targetLang, context = "") {
     const targetLanguage = languageMap[targetLang] || targetLang;
     
     let systemPrompt = `You are a professional translator specialized in ${sourceLanguage} and ${targetLanguage}. Translate the given text from ${sourceLanguage} to ${targetLanguage}. Provide ONLY the translation, without any explanations or additional text.`;
-    
+
+    if (targetLang === 'ja') {
+      systemPrompt += ` Use plain, colloquial style such as "〜だ" or "〜である." for Japanese translation.`;
+    }
+
     if (context) {
       systemPrompt += ` Use the following context to inform your translation: ${context}`;
     }
